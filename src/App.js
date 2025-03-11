@@ -1,4 +1,3 @@
-// src/App.js
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   MapContainer, 
@@ -37,8 +36,8 @@ const MousePositionTracker = ({ onPositionChange }) => {
   return null;
 };
 
-// Component for placing markers on click and handling border drawing
-const ClickHandler = ({ onMarkerPlace, isMarkingMode, isBorderMode, featureGroupRef }) => {
+// Component for placing markers on click
+const ClickHandler = ({ onMarkerPlace, isMarkingMode, isBorderMode }) => {
   const [borderPoints, setBorderPoints] = useState([]);
   const mapRef = useRef();
   
@@ -51,60 +50,31 @@ const ClickHandler = ({ onMarkerPlace, isMarkingMode, isBorderMode, featureGroup
         const updatedPoints = [...borderPoints, newPoint];
         setBorderPoints(updatedPoints);
         
-        // Clear any existing temporary line
-        if (window.tempLine && mapRef.current && mapRef.current.hasLayer(window.tempLine)) {
-          mapRef.current.removeLayer(window.tempLine);
-        }
-        
-        // Get the map instance
-        mapRef.current = mapRef.current || e.target;
-        
-        // Draw or update the border line
+        // Draw line on the map
         if (updatedPoints.length >= 2) {
-          window.tempLine = L.polyline(updatedPoints, { color: 'red', weight: 3 });
-          window.tempLine.addTo(mapRef.current);
+          // Get the map instance
+          mapRef.current = mapRef.current || e.target;
+          
+          // Draw or update the border line
+          drawBorderLine(updatedPoints, mapRef.current);
         }
       }
     }
   });
   
-  // Complete the polygon when double clicking in border mode
-  useMapEvents({
-    dblclick: (e) => {
-      if (isBorderMode && borderPoints.length >= 3) {
-        // Remove the temporary line
-        if (window.tempLine && mapRef.current && mapRef.current.hasLayer(window.tempLine)) {
-          mapRef.current.removeLayer(window.tempLine);
-          window.tempLine = null;
-        }
-        
-        // Create a proper polygon using Leaflet's L.polygon
-        const polygon = L.polygon(borderPoints, { color: 'blue', weight: 2 });
-        
-        // Add the polygon to the feature group
-        if (featureGroupRef.current) {
-          featureGroupRef.current.addLayer(polygon);
-          
-          // Create a synthetic "created" event to trigger the same handling as Leaflet Draw
-          const syntheticEvent = {
-            layerType: 'polygon',
-            layer: polygon
-          };
-          
-          // Dispatch a custom event that will be caught by our event listener
-          const customEvent = new CustomEvent('border-polygon-created', { 
-            detail: syntheticEvent 
-          });
-          document.dispatchEvent(customEvent);
-        }
-        
-        // Reset border points after creating polygon
-        setBorderPoints([]);
-      }
+  // Function to draw the border line
+  const drawBorderLine = (points, map) => {
+    // If there's an existing temporary line, remove it
+    if (window.tempLine && map.hasLayer(window.tempLine)) {
+      map.removeLayer(window.tempLine);
     }
-  });
+    
+    // Create a new polyline with the points
+    window.tempLine = L.polyline(points, { color: 'red', weight: 3 });
+    window.tempLine.addTo(map);
+  };
   
-  // If border mode is turned off, clean up and reset
+  // If border mode is turned off, clean up the temporary line
   useEffect(() => {
     if (!isBorderMode && mapRef.current && window.tempLine) {
       mapRef.current.removeLayer(window.tempLine);
@@ -124,6 +94,11 @@ const UNIT_CONVERSIONS = {
     squareFeet: 10.7639,
     squareKilometers: 0.000001,
     squareMiles: 3.86102e-7
+  },
+  meters: {
+    kilometers: 0.001,
+    miles: 0.000621371,
+    feet: 3.28084
   }
 };
 
@@ -137,6 +112,8 @@ const App = () => {
     squareMiles: 0,
     perimeter: 0
   });
+  const [polylines, setPolylines] = useState([]);
+  const [currentPolyline, setCurrentPolyline] = useState(null);
   const [polygons, setPolygons] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -146,26 +123,14 @@ const App = () => {
   const [isMarkingMode, setIsMarkingMode] = useState(false);
   const [isBorderMode, setIsBorderMode] = useState(false);
   const [selectedUnit, setSelectedUnit] = useState('squareMeters');
+  const [selectedDistanceUnit, setSelectedDistanceUnit] = useState('meters');
   const featureGroupRef = useRef();
   const mapRef = useRef();
-
-  // Add event listener for custom border polygon creation
-  useEffect(() => {
-    const handleBorderPolygonCreated = (e) => {
-      handleCreate(e.detail);
-    };
-    
-    document.addEventListener('border-polygon-created', handleBorderPolygonCreated);
-    
-    return () => {
-      document.removeEventListener('border-polygon-created', handleBorderPolygonCreated);
-    };
-  }, [polygons]); // Add polygons as a dependency since handleCreate uses it
 
   const handleCreate = (e) => {
     const { layerType, layer } = e;
     
-    if (layerType === 'polygon') {
+    if (layerType === 'polygon' || layerType === 'rectangle') {
       // Get the coordinates from the created polygon
       const latLngs = layer.getLatLngs()[0];
       const coordinates = latLngs.map(latLng => [latLng.lat, latLng.lng]);
@@ -198,7 +163,42 @@ const App = () => {
       
       // Set as current polygon
       setCurrentPolygon(newPolygon);
-    }
+    } else if (layerType === 'polyline') {
+      // Get the coordinates from the created polyline
+      const latLngs = layer.getLatLngs();
+      const coordinates = latLngs.map(latLng => [latLng.lat, latLng.lng]);
+      
+      // Calculate distance
+      const distanceInMeters = calculatePolylineDistance(coordinates);
+      
+      // Convert to different units
+      const distanceCalculations = {
+        meters: distanceInMeters,
+        kilometers: distanceInMeters * UNIT_CONVERSIONS.meters.kilometers,
+        miles: distanceInMeters * UNIT_CONVERSIONS.meters.miles,
+        feet: distanceInMeters * UNIT_CONVERSIONS.meters.feet
+      };
+      
+      const newPolyline = {
+        id: Date.now(),
+        coordinates,
+        ...distanceCalculations
+      };
+      
+      // Add the polyline to state
+      setPolylines([...polylines, newPolyline]);
+      
+      // Set as current polyline
+      setCurrentPolyline(newPolyline);
+    }else if (layerType=="marker"){
+      const latLng = layer._latlng;
+        const newMarker = {
+          id: Date.now(),
+          position: [latLng.lat, latLng.lng],
+          label: `Marker ${markers.length + 1}`
+        };
+        setMarkers([...markers, newMarker]);
+      }
   };
 
   const calculateArea = (coordinates) => {
@@ -223,6 +223,17 @@ const App = () => {
       perimeter += Math.sqrt(dx * dx + dy * dy);
     }
     return perimeter * 111000; // rough conversion to meters
+  };
+
+  const calculatePolylineDistance = (coordinates) => {
+    // Calculate the total distance of a polyline
+    let distance = 0;
+    for (let i = 0; i < coordinates.length - 1; i++) {
+      const dx = coordinates[i][0] - coordinates[i+1][0];
+      const dy = coordinates[i][1] - coordinates[i+1][1];
+      distance += Math.sqrt(dx * dx + dy * dy);
+    }
+    return distance * 111000; // rough conversion to meters
   };
 
   const handleMarkerPlace = (latlng) => {
@@ -341,6 +352,7 @@ const App = () => {
   const exportData = () => {
     const exportData = {
       polygons,
+      polylines,
       markers
     };
     
@@ -382,8 +394,36 @@ const App = () => {
     }
   };
 
+  const copyPolylineCoordinates = () => {
+    if (currentPolyline) {
+      // Format coordinates as readable text
+      const formattedCoords = currentPolyline.coordinates
+        .map(coord => `[${coord[0].toFixed(6)}, ${coord[1].toFixed(6)}]`)
+        .join(',\n');
+      
+      navigator.clipboard.writeText(`[\n${formattedCoords}\n]`)
+        .then(() => {
+          alert('Polyline coordinates copied to clipboard!');
+        })
+        .catch(err => {
+          console.error('Failed to copy coordinates: ', err);
+          // Fallback for browsers that don't support clipboard API
+          const textArea = document.createElement('textarea');
+          textArea.value = `[\n${formattedCoords}\n]`;
+          document.body.appendChild(textArea);
+          textArea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textArea);
+          alert('Polyline coordinates copied to clipboard!');
+        });
+    } else {
+      alert('No polyline selected to copy.');
+    }
+  };
+
   const handlePolygonSelect = (polygon) => {
     setCurrentPolygon(polygon);
+    setCurrentPolyline(null);
     setMeasurements({
       squareMeters: polygon.squareMeters,
       acres: polygon.acres,
@@ -395,6 +435,11 @@ const App = () => {
     });
   };
 
+  const handlePolylineSelect = (polyline) => {
+    setCurrentPolyline(polyline);
+    setCurrentPolygon(null);
+  };
+
   // Format the measurement value based on the unit
   const formatMeasurement = (value, unit) => {
     const precision = {
@@ -404,7 +449,11 @@ const App = () => {
       squareFeet: 2,
       squareKilometers: 6,
       squareMiles: 6,
-      perimeter: 2
+      perimeter: 2,
+      meters: 2,
+      kilometers: 3,
+      miles: 3,
+      feet: 1
     };
     
     return Number(value).toFixed(precision[unit] || 2);
@@ -418,7 +467,11 @@ const App = () => {
     squareFeet: 'ft²',
     squareKilometers: 'km²',
     squareMiles: 'mi²',
-    perimeter: 'm'
+    perimeter: 'm',
+    meters: 'm',
+    kilometers: 'km',
+    miles: 'mi',
+    feet: 'ft'
   };
 
   return (
@@ -444,10 +497,10 @@ const App = () => {
                 position="topright"
                 onCreated={handleCreate}
                 draw={{
-                  rectangle: false,
+                  rectangle: true,
                   circle: false,
                   circlemarker: false,
-                  marker: false,  // We'll handle markers ourselves
+                  marker: true,  // We'll handle markers ourselves
                   polyline: true,
                   polygon: true,
                 }}
@@ -471,16 +524,9 @@ const App = () => {
               </Marker>
             ))}
             
-            {/* Mouse position tracker */}
-            <MousePositionTracker onPositionChange={setMousePosition} />
+            {/* Mouse position tracker is being problematic : bug */}
+            {/* <MousePositionTracker onPositionChange={setMousePosition} /> */}
             
-            {/* Click handler for marker placement and border drawing */}
-            <ClickHandler 
-              onMarkerPlace={handleMarkerPlace} 
-              isMarkingMode={isMarkingMode}
-              isBorderMode={isBorderMode}
-              featureGroupRef={featureGroupRef}
-            />
           </MapContainer>
           
           <div className="mouse-position">
@@ -489,12 +535,10 @@ const App = () => {
         </div>
         
         <div className="controls-panel">
-
-        <h1>Map Calculator</h1>
           <div className="measurements">
-            <h2>Measurements</h2>
+            <h1> Geo Measurements</h1>
             
-            <div className="measurement-units">
+            {/* <div className="measurement-units">
               <label htmlFor="unit-select">Display unit:</label>
               <select 
                 id="unit-select" 
@@ -509,38 +553,74 @@ const App = () => {
                 <option value="squareKilometers">Square Kilometers (km²)</option>
                 <option value="squareMiles">Square Miles (mi²)</option>
               </select>
-            </div>
+              
+              <label htmlFor="distance-unit-select" style={{ marginLeft: '10px' }}>Distance unit:</label>
+              <select 
+                id="distance-unit-select" 
+                value={selectedDistanceUnit}
+                onChange={(e) => setSelectedDistanceUnit(e.target.value)}
+                className="unit-select"
+              >
+                <option value="meters">Meters (m)</option>
+                <option value="kilometers">Kilometers (km)</option>
+                <option value="miles">Miles (mi)</option>
+                <option value="feet">Feet (ft)</option>
+              </select>
+            </div> */}
             
-            <div className="measurements-grid">
-              <div className="measurement-item">
-                <span className="measurement-label">Area (m²):</span>
-                <span className="measurement-value">{formatMeasurement(measurements.squareMeters)} m²</span>
+            {currentPolygon && (
+              <div className="measurements-grid">
+                <div className="measurement-item">
+                  <span className="measurement-label">Area (m²):</span>
+                  <span className="measurement-value">{formatMeasurement(measurements.squareMeters)} m²</span>
+                </div>
+                <div className="measurement-item">
+                  <span className="measurement-label">Area (acres):</span>
+                  <span className="measurement-value">{formatMeasurement(measurements.acres, 'acres')} acres</span>
+                </div>
+                <div className="measurement-item">
+                  <span className="measurement-label">Area (ha):</span>
+                  <span className="measurement-value">{formatMeasurement(measurements.hectares, 'hectares')} ha</span>
+                </div>
+                <div className="measurement-item">
+                  <span className="measurement-label">Area (ft²):</span>
+                  <span className="measurement-value">{formatMeasurement(measurements.squareFeet, 'squareFeet')} ft²</span>
+                </div>
+                <div className="measurement-item">
+                  <span className="measurement-label">Area (km²):</span>
+                  <span className="measurement-value">{formatMeasurement(measurements.squareKilometers, 'squareKilometers')} km²</span>
+                </div>
+                <div className="measurement-item">
+                  <span className="measurement-label">Area (mi²):</span>
+                  <span className="measurement-value">{formatMeasurement(measurements.squareMiles, 'squareMiles')} mi²</span>
+                </div>
+                <div className="measurement-item">
+                  <span className="measurement-label">Perimeter:</span>
+                  <span className="measurement-value">{formatMeasurement(measurements.perimeter, 'perimeter')} m</span>
+                </div>
               </div>
-              <div className="measurement-item">
-                <span className="measurement-label">Area (acres):</span>
-                <span className="measurement-value">{formatMeasurement(measurements.acres, 'acres')} acres</span>
+            )}
+            
+            {currentPolyline && (
+              <div className="measurements-grid">
+                <div className="measurement-item">
+                  <span className="measurement-label">Distance (m):</span>
+                  <span className="measurement-value">{formatMeasurement(currentPolyline.meters, 'meters')} m</span>
+                </div>
+                <div className="measurement-item">
+                  <span className="measurement-label">Distance (km):</span>
+                  <span className="measurement-value">{formatMeasurement(currentPolyline.kilometers, 'kilometers')} km</span>
+                </div>
+                <div className="measurement-item">
+                  <span className="measurement-label">Distance (mi):</span>
+                  <span className="measurement-value">{formatMeasurement(currentPolyline.miles, 'miles')} mi</span>
+                </div>
+                <div className="measurement-item">
+                  <span className="measurement-label">Distance (ft):</span>
+                  <span className="measurement-value">{formatMeasurement(currentPolyline.feet, 'feet')} ft</span>
+                </div>
               </div>
-              <div className="measurement-item">
-                <span className="measurement-label">Area (ha):</span>
-                <span className="measurement-value">{formatMeasurement(measurements.hectares, 'hectares')} ha</span>
-              </div>
-              <div className="measurement-item">
-                <span className="measurement-label">Area (ft²):</span>
-                <span className="measurement-value">{formatMeasurement(measurements.squareFeet, 'squareFeet')} ft²</span>
-              </div>
-              <div className="measurement-item">
-                <span className="measurement-label">Area (km²):</span>
-                <span className="measurement-value">{formatMeasurement(measurements.squareKilometers, 'squareKilometers')} km²</span>
-              </div>
-              <div className="measurement-item">
-                <span className="measurement-label">Area (mi²):</span>
-                <span className="measurement-value">{formatMeasurement(measurements.squareMiles, 'squareMiles')} mi²</span>
-              </div>
-              <div className="measurement-item">
-                <span className="measurement-label">Perimeter:</span>
-                <span className="measurement-value">{formatMeasurement(measurements.perimeter, 'perimeter')} m</span>
-              </div>
-            </div>
+            )}
             
             {currentPolygon && (
               <div className="current-polygon">
@@ -559,34 +639,46 @@ const App = () => {
                 </div>
               </div>
             )}
+            
+            {currentPolyline && (
+              <div className="current-polyline">
+                <h3>Current Polyline</h3>
+                <div className="polyline-coordinates-container">
+                  <textarea 
+                    className="polyline-coordinates" 
+                    readOnly 
+                    value={currentPolyline.coordinates
+                      .map(coord => `[${coord[0].toFixed(6)}, ${coord[1].toFixed(6)}]`)
+                      .join(',\n')}
+                  />
+                  <button onClick={copyPolylineCoordinates} className="copy-button">
+                    Copy
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
           
           <div className="actions">
             <button 
-              onClick={toggleMarkingMode} 
-              className={`action-button ${isMarkingMode ? 'active' : ''}`}
-            >
-              {isMarkingMode ? 'Exit Marker Mode' : 'Place Markers'}
-            </button>
-            
-            <button 
-              onClick={toggleBorderMode} 
-              className={`action-button ${isBorderMode ? 'active' : ''}`}
-            >
-              {isBorderMode ? 'Exit Border Mode' : 'Draw Border'}
-            </button>
-            
-            <button 
               onClick={detectBoundaries} 
-              disabled={isProcessing}
+              disabled={true}
               className="action-button"
             >
               {isProcessing ? 'Processing...' : 'Detect Boundaries'}
+            </button> 
+            
+            <button 
+              onClick={detectBoundaries} 
+              disabled={true}
+              className="action-button"
+            >
+              {isProcessing ? 'Processing...' : 'Track Changes'}
             </button>
             
             <button 
               onClick={exportData} 
-              disabled={polygons.length === 0 && markers.length === 0}
+              disabled={polygons.length === 0 && polylines.length === 0 && markers.length === 0}
               className="action-button"
             >
               Export Data
@@ -622,9 +714,9 @@ const App = () => {
             </div>
             
             <div className="polygons-section">
-              <h3>Saved Measurements</h3>
+              <h3>Saved Area Measurements</h3>
               {polygons.length === 0 ? (
-                <p>No measurements saved</p>
+                <p>No area measurements saved</p>
               ) : (
                 <ul>
                   {polygons.map(polygon => (
@@ -634,6 +726,25 @@ const App = () => {
                       onClick={() => handlePolygonSelect(polygon)}
                     >
                       Area: {formatMeasurement(polygon[selectedUnit], selectedUnit)} {unitLabels[selectedUnit]} | Perimeter: {formatMeasurement(polygon.perimeter, 'perimeter')} m
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            
+            <div className="polylines-section">
+              <h3>Saved Distance Measurements</h3>
+              {polylines.length === 0 ? (
+                <p>No distance measurements saved</p>
+              ) : (
+                <ul>
+                  {polylines.map(polyline => (
+                    <li 
+                      key={polyline.id}
+                      className={currentPolyline && currentPolyline.id === polyline.id ? 'selected' : ''}
+                      onClick={() => handlePolylineSelect(polyline)}
+                    >
+                      Distance: {formatMeasurement(polyline[selectedDistanceUnit], selectedDistanceUnit)} {unitLabels[selectedDistanceUnit]}
                     </li>
                   ))}
                 </ul>
