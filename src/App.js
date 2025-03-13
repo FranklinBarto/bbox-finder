@@ -23,68 +23,68 @@ L.Icon.Default.mergeOptions({
 });
 
 // Component to track mouse position
-const MousePositionTracker = ({ onPositionChange }) => {
-  useMapEvents({
-    mousemove: (e) => {
-      const { lat, lng } = e.latlng;
-      onPositionChange({ 
-        lat: lat.toFixed(6), 
-        lng: lng.toFixed(6) 
-      });
-    }
-  });
-  return null;
-};
+// const MousePositionTracker = ({ onPositionChange }) => {
+//   useMapEvents({
+//     mousemove: (e) => {
+//       const { lat, lng } = e.latlng;
+//       onPositionChange({ 
+//         lat: lat.toFixed(6), 
+//         lng: lng.toFixed(6) 
+//       });
+//     }
+//   });
+//   return null;
+// };
 
 // Component for placing markers on click
-const ClickHandler = ({ onMarkerPlace, isMarkingMode, isBorderMode }) => {
-  const [borderPoints, setBorderPoints] = useState([]);
-  const mapRef = useRef();
+// const ClickHandler = ({ onMarkerPlace, isMarkingMode, isBorderMode }) => {
+//   const [borderPoints, setBorderPoints] = useState([]);
+//   const mapRef = useRef();
   
-  useMapEvents({
-    click: (e) => {
-      if (isMarkingMode) {
-        onMarkerPlace(e.latlng);
-      } else if (isBorderMode) {
-        const newPoint = [e.latlng.lat, e.latlng.lng];
-        const updatedPoints = [...borderPoints, newPoint];
-        setBorderPoints(updatedPoints);
+//   useMapEvents({
+//     click: (e) => {
+//       if (isMarkingMode) {
+//         onMarkerPlace(e.latlng);
+//       } else if (isBorderMode) {
+//         const newPoint = [e.latlng.lat, e.latlng.lng];
+//         const updatedPoints = [...borderPoints, newPoint];
+//         setBorderPoints(updatedPoints);
         
-        // Draw line on the map
-        if (updatedPoints.length >= 2) {
-          // Get the map instance
-          mapRef.current = mapRef.current || e.target;
+//         // Draw line on the map
+//         if (updatedPoints.length >= 2) {
+//           // Get the map instance
+//           mapRef.current = mapRef.current || e.target;
           
-          // Draw or update the border line
-          drawBorderLine(updatedPoints, mapRef.current);
-        }
-      }
-    }
-  });
+//           // Draw or update the border line
+//           drawBorderLine(updatedPoints, mapRef.current);
+//         }
+//       }
+//     }
+//   });
   
-  // Function to draw the border line
-  const drawBorderLine = (points, map) => {
-    // If there's an existing temporary line, remove it
-    if (window.tempLine && map.hasLayer(window.tempLine)) {
-      map.removeLayer(window.tempLine);
-    }
+//   // Function to draw the border line
+//   const drawBorderLine = (points, map) => {
+//     // If there's an existing temporary line, remove it
+//     if (window.tempLine && map.hasLayer(window.tempLine)) {
+//       map.removeLayer(window.tempLine);
+//     }
     
-    // Create a new polyline with the points
-    window.tempLine = L.polyline(points, { color: 'red', weight: 3 });
-    window.tempLine.addTo(map);
-  };
+//     // Create a new polyline with the points
+//     window.tempLine = L.polyline(points, { color: 'red', weight: 3 });
+//     window.tempLine.addTo(map);
+//   };
   
-  // If border mode is turned off, clean up the temporary line
-  useEffect(() => {
-    if (!isBorderMode && mapRef.current && window.tempLine) {
-      mapRef.current.removeLayer(window.tempLine);
-      window.tempLine = null;
-      setBorderPoints([]);
-    }
-  }, [isBorderMode]);
+//   // If border mode is turned off, clean up the temporary line
+//   useEffect(() => {
+//     if (!isBorderMode && mapRef.current && window.tempLine) {
+//       mapRef.current.removeLayer(window.tempLine);
+//       window.tempLine = null;
+//       setBorderPoints([]);
+//     }
+//   }, [isBorderMode]);
   
-  return null;
-};
+//   return null;
+// };
 
 // Unit conversion constants
 const UNIT_CONVERSIONS = {
@@ -236,26 +236,26 @@ const App = () => {
     return distance * 111000; // rough conversion to meters
   };
 
-  const handleMarkerPlace = (latlng) => {
-    if (isMarkingMode) {
-      const newMarker = {
-        id: Date.now(),
-        position: [latlng.lat, latlng.lng],
-        label: `Marker ${markers.length + 1}`
-      };
-      setMarkers([...markers, newMarker]);
-    }
-  };
+  // const handleMarkerPlace = (latlng) => {
+  //   if (isMarkingMode) {
+  //     const newMarker = {
+  //       id: Date.now(),
+  //       position: [latlng.lat, latlng.lng],
+  //       label: `Marker ${markers.length + 1}`
+  //     };
+  //     setMarkers([...markers, newMarker]);
+  //   }
+  // };
 
-  const toggleMarkingMode = () => {
-    setIsMarkingMode(!isMarkingMode);
-    if (isBorderMode) setIsBorderMode(false);
-  };
+  // const toggleMarkingMode = () => {
+  //   setIsMarkingMode(!isMarkingMode);
+  //   if (isBorderMode) setIsBorderMode(false);
+  // };
 
-  const toggleBorderMode = () => {
-    setIsBorderMode(!isBorderMode);
-    if (isMarkingMode) setIsMarkingMode(false);
-  };
+  // const toggleBorderMode = () => {
+  //   setIsBorderMode(!isBorderMode);
+  //   if (isMarkingMode) setIsMarkingMode(false);
+  // };
 
   const removeMarker = (markerId) => {
     setMarkers(markers.filter(marker => marker.id !== markerId));
