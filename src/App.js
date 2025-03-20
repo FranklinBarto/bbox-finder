@@ -5,7 +5,9 @@ import {
   FeatureGroup, 
   Marker, 
   Popup, 
-  useMapEvents 
+  useMapEvents,
+  LayersControl,
+  useMap
 } from 'react-leaflet';
 import { EditControl } from 'react-leaflet-draw';
 import axios from 'axios';
@@ -22,70 +24,6 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-// Component to track mouse position
-// const MousePositionTracker = ({ onPositionChange }) => {
-//   useMapEvents({
-//     mousemove: (e) => {
-//       const { lat, lng } = e.latlng;
-//       onPositionChange({ 
-//         lat: lat.toFixed(6), 
-//         lng: lng.toFixed(6) 
-//       });
-//     }
-//   });
-//   return null;
-// };
-
-// Component for placing markers on click
-// const ClickHandler = ({ onMarkerPlace, isMarkingMode, isBorderMode }) => {
-//   const [borderPoints, setBorderPoints] = useState([]);
-//   const mapRef = useRef();
-  
-//   useMapEvents({
-//     click: (e) => {
-//       if (isMarkingMode) {
-//         onMarkerPlace(e.latlng);
-//       } else if (isBorderMode) {
-//         const newPoint = [e.latlng.lat, e.latlng.lng];
-//         const updatedPoints = [...borderPoints, newPoint];
-//         setBorderPoints(updatedPoints);
-        
-//         // Draw line on the map
-//         if (updatedPoints.length >= 2) {
-//           // Get the map instance
-//           mapRef.current = mapRef.current || e.target;
-          
-//           // Draw or update the border line
-//           drawBorderLine(updatedPoints, mapRef.current);
-//         }
-//       }
-//     }
-//   });
-  
-//   // Function to draw the border line
-//   const drawBorderLine = (points, map) => {
-//     // If there's an existing temporary line, remove it
-//     if (window.tempLine && map.hasLayer(window.tempLine)) {
-//       map.removeLayer(window.tempLine);
-//     }
-    
-//     // Create a new polyline with the points
-//     window.tempLine = L.polyline(points, { color: 'red', weight: 3 });
-//     window.tempLine.addTo(map);
-//   };
-  
-//   // If border mode is turned off, clean up the temporary line
-//   useEffect(() => {
-//     if (!isBorderMode && mapRef.current && window.tempLine) {
-//       mapRef.current.removeLayer(window.tempLine);
-//       window.tempLine = null;
-//       setBorderPoints([]);
-//     }
-//   }, [isBorderMode]);
-  
-//   return null;
-// };
-
 // Unit conversion constants
 const UNIT_CONVERSIONS = {
   squareMeters: {
@@ -100,6 +38,52 @@ const UNIT_CONVERSIONS = {
     miles: 0.000621371,
     feet: 3.28084
   }
+};
+
+// MapController component to handle map interactions
+const MapController = ({ onFlyTo }) => {
+  const map = useMapEvents({});
+  
+  useEffect(() => {
+    if (onFlyTo) {
+      onFlyTo(map);
+    }
+  }, [map, onFlyTo]);
+  
+  return null;
+};
+
+// Create a custom component to handle map events
+function MapEventHandler({ setMousePosition }) {
+  const map = useMap();
+  
+  // Set up the mousemove event listener
+  map.on("mousemove", (e) => {
+    setMousePosition({
+      lat: e.latlng.lat.toFixed(6),
+      lng: e.latlng.lng.toFixed(6),
+    });
+  });
+
+  return null;
+}
+
+const CustomZoomControl = () => {
+  const map = useMap();
+
+  useEffect(() => {
+    const zoomControl = L.control.zoom({
+      position: "bottomleft", // Move zoom controls to bottom-left
+    });
+
+    map.addControl(zoomControl);
+    
+    return () => {
+      map.removeControl(zoomControl);
+    };
+  }, [map]);
+
+  return null;
 };
 
 const App = () => {
@@ -124,8 +108,33 @@ const App = () => {
   const [isBorderMode, setIsBorderMode] = useState(false);
   const [selectedUnit, setSelectedUnit] = useState('squareMeters');
   const [selectedDistanceUnit, setSelectedDistanceUnit] = useState('meters');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
   const featureGroupRef = useRef();
   const mapRef = useRef();
+  const searchInputRef = useRef();
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    const map = mapRef.current;
+
+    // Attach event listener but do NOT interfere with interactivity
+    const updateMousePosition = (e) => {
+      setMousePosition({
+        lat: e.latlng.lat.toFixed(6),
+        lng: e.latlng.lng.toFixed(6),
+      });
+    };
+
+    map.on("mousemove", updateMousePosition);
+
+    return () => {
+      map.off("mousemove", updateMousePosition);
+    };
+  }, []);
 
   const handleCreate = (e) => {
     const { layerType, layer } = e;
@@ -190,7 +199,7 @@ const App = () => {
       
       // Set as current polyline
       setCurrentPolyline(newPolyline);
-    }else if (layerType=="marker"){
+    } else if (layerType=="marker"){
       const latLng = layer._latlng;
         const newMarker = {
           id: Date.now(),
@@ -236,29 +245,67 @@ const App = () => {
     return distance * 111000; // rough conversion to meters
   };
 
-  // const handleMarkerPlace = (latlng) => {
-  //   if (isMarkingMode) {
-  //     const newMarker = {
-  //       id: Date.now(),
-  //       position: [latlng.lat, latlng.lng],
-  //       label: `Marker ${markers.length + 1}`
-  //     };
-  //     setMarkers([...markers, newMarker]);
-  //   }
-  // };
-
-  // const toggleMarkingMode = () => {
-  //   setIsMarkingMode(!isMarkingMode);
-  //   if (isBorderMode) setIsBorderMode(false);
-  // };
-
-  // const toggleBorderMode = () => {
-  //   setIsBorderMode(!isBorderMode);
-  //   if (isMarkingMode) setIsMarkingMode(false);
-  // };
-
   const removeMarker = (markerId) => {
     setMarkers(markers.filter(marker => marker.id !== markerId));
+  };
+
+  // Handle search query change
+  const handleSearchChange = (e) => {
+    setSearchQuery(e.target.value);
+    if (e.target.value.length > 2) {
+      setShowSearchResults(true);
+    } else {
+      setShowSearchResults(false);
+    }
+  };
+
+  // Search for locations
+  const searchLocations = async () => {
+    if (searchQuery.trim().length < 3) return;
+
+    setIsSearching(true);
+    try {
+      // Using Nominatim API for geocoding
+      const response = await axios.get(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=5`,
+        { headers: { 'Accept-Language': 'en-US,en' } }
+      );
+      
+      setSearchResults(response.data);
+    } catch (error) {
+      console.error('Error searching for location:', error);
+      setErrorMessage('Error searching for location. Please try again.');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Handle search submission
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    searchLocations();
+  };
+
+  // Fly to location
+  const flyToLocation = (result) => {
+    const mapInstance = mapRef.current;
+    if (mapInstance) {
+      const lat = parseFloat(result.lat);
+      const lon = parseFloat(result.lon);
+      mapInstance.flyTo([lat, lon], 14);
+      
+      // Add a marker for the searched location
+      const newMarker = {
+        id: Date.now(),
+        position: [lat, lon],
+        label: result.display_name.split(',')[0] // Use first part of the name
+      };
+      setMarkers([...markers, newMarker]);
+      
+      // Clear search results and query
+      setShowSearchResults(false);
+      setSearchResults([]);
+    }
   };
 
   const detectBoundaries = async () => {
@@ -474,24 +521,114 @@ const App = () => {
     feet: 'ft'
   };
 
+  // Handle clicking outside search results
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchInputRef.current && !searchInputRef.current.contains(event.target)) {
+        setShowSearchResults(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // hook to handle mouse movement
+  const MouseMoveHandler = () => {
+    useMapEvents({
+      mousemove: (e) => {
+        setMousePosition({
+          lat: e.latlng.lat.toFixed(6),
+          lng: e.latlng.lng.toFixed(6),
+        });
+      },
+    });
+
+    return null; // This component does not render anything
+  };
+
   return (
     <div className="app-container">
+      <div className="location-bar">
+        <form onSubmit={handleSearchSubmit} ref={searchInputRef}>
+          <div className="search-container">
+            <input
+              type="text"
+              placeholder="Search for city, town, county..."
+              value={searchQuery}
+              onChange={handleSearchChange}
+              className="search-input"
+            />
+            <button type="submit" className="search-button" disabled={isSearching}>
+              {isSearching ? 'Searching...' : 'Search'}
+            </button>
+          </div>
+          
+          {showSearchResults && searchResults.length > 0 && (
+            <div className="search-results">
+              {searchResults.map(result => (
+                <div 
+                  key={result.place_id} 
+                  className="search-result-item"
+                  onClick={() => flyToLocation(result)}
+                >
+                  <div className="result-name">{result.display_name.split(',')[0]}</div>
+                  <div className="result-address">{result.display_name}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </form>
+      </div>
+      
       <div className="content">
         <div className="map-container">
           <MapContainer 
             center={[40.505, -100.09]} 
             zoom={13} 
             style={{ height: '100%', width: '100%' }}
-            ref={mapRef}
+            // whenCreated={(map) => { mapRef.current = map; }}
+            zoomControl={false}
+            whenCreated={(map) => {
+              mapRef.current = map;
+    
+              // Attach mousemove event listener to the map
+              map.on("mousemove", (e) => {
+                setMousePosition({
+                  lat: e.latlng.lat.toFixed(6),
+                  lng: e.latlng.lng.toFixed(6),
+                });
+              });
+            }}
           >
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            {/* <MapEventHandler setMousePosition={setMousePosition} /> */}
+            <MapController 
+              onFlyTo={(mapInstance) => { mapRef.current = mapInstance; }}
             />
-            <TileLayer
-              attribution='&copy; <a href="https://www.esri.com">Esri</a>'
-              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-            />
+
+            <CustomZoomControl/>
+            
+            {/* <MouseMoveHandler /> */}
+            <LayersControl position="topright">
+        
+              <LayersControl.BaseLayer name="Satellite Imagery" checked>
+                <TileLayer
+                  attribution='&copy; <a href="https://www.esri.com">Esri</a>'
+                  url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                />
+              </LayersControl.BaseLayer>
+
+              <LayersControl.BaseLayer name="Vector Map">
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+              </LayersControl.BaseLayer>
+              
+            </LayersControl>
+            
             <FeatureGroup ref={featureGroupRef}>
               <EditControl
                 position="topright"
@@ -500,7 +637,7 @@ const App = () => {
                   rectangle: true,
                   circle: false,
                   circlemarker: false,
-                  marker: true,  // We'll handle markers ourselves
+                  marker: true,
                   polyline: true,
                   polygon: true,
                 }}
@@ -523,50 +660,16 @@ const App = () => {
                 </Popup>
               </Marker>
             ))}
-            
-            {/* Mouse position tracker is being problematic : bug */}
-            {/* <MousePositionTracker onPositionChange={setMousePosition} /> */}
-            
           </MapContainer>
           
-          <div className="mouse-position">
+          {/* <div className="mouse-position">
             Mouse Position: Lat {mousePosition.lat}, Lng {mousePosition.lng}
-          </div>
+          </div> */}
         </div>
         
         <div className="controls-panel">
           <div className="measurements">
             <h1> Geo Measurements</h1>
-            
-            {/* <div className="measurement-units">
-              <label htmlFor="unit-select">Display unit:</label>
-              <select 
-                id="unit-select" 
-                value={selectedUnit}
-                onChange={(e) => setSelectedUnit(e.target.value)}
-                className="unit-select"
-              >
-                <option value="squareMeters">Square Meters (m²)</option>
-                <option value="acres">Acres</option>
-                <option value="hectares">Hectares (ha)</option>
-                <option value="squareFeet">Square Feet (ft²)</option>
-                <option value="squareKilometers">Square Kilometers (km²)</option>
-                <option value="squareMiles">Square Miles (mi²)</option>
-              </select>
-              
-              <label htmlFor="distance-unit-select" style={{ marginLeft: '10px' }}>Distance unit:</label>
-              <select 
-                id="distance-unit-select" 
-                value={selectedDistanceUnit}
-                onChange={(e) => setSelectedDistanceUnit(e.target.value)}
-                className="unit-select"
-              >
-                <option value="meters">Meters (m)</option>
-                <option value="kilometers">Kilometers (km)</option>
-                <option value="miles">Miles (mi)</option>
-                <option value="feet">Feet (ft)</option>
-              </select>
-            </div> */}
             
             {currentPolygon && (
               <div className="measurements-grid">
