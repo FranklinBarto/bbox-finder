@@ -1,4 +1,4 @@
-*{
+* {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -7,10 +7,10 @@
 /* src/App.css */
 .app-container {
   font-family: Arial, sans-serif;
-  width: 100vw;
+  width: 100%;
   height: 100vh;
   margin: 0 auto;
-  padding: 20px;
+  padding: 10px;
   overflow: hidden;
 }
 
@@ -31,8 +31,8 @@ header {
   overflow: hidden;
   left: 0;
   right: 0;
-  width: 100vw;
-  height: 96vh;
+  width: 100%;
+  height: 50vh; /* Smaller height on mobile */
   z-index: 1;
 }
 
@@ -49,23 +49,25 @@ header {
 }
 
 .controls-panel {
-  padding: 20px;
+  padding: 15px;
   background-color: #f5f5f5;
   border-radius: 5px;
   border: 1px solid #ddd;
-  height: 96vh;
-  overflow-y: scroll;
+  height: auto;
+  max-height: 98vh;
+  overflow-y: auto;
 }
 
 .measurements {
   margin-bottom: 20px;
 }
 
-.measurements h1{
-  margin: 20px auto;
+.measurements h1 {
+  margin: 15px auto;
+  font-size: 1.5rem;
 }
 
-.measurements textarea{
+.measurements textarea {
   width: 100%;
 }
 
@@ -83,11 +85,13 @@ header {
   border: 1px solid #ccc;
   background-color: white;
   font-size: 14px;
+  width: 100%;
+  max-width: 250px;
 }
 
 .measurements-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 10px;
   margin-bottom: 15px;
   padding: 10px;
@@ -125,7 +129,7 @@ header {
 
 .polygon-coordinates {
   width: 100%;
-  height: 100px;
+  height: 80px;
   padding: 8px;
   border: 1px solid #ccc;
   border-radius: 4px;
@@ -154,12 +158,12 @@ header {
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 20px;
+  gap: 8px;
+  margin-bottom: 15px;
 }
 
 .action-button {
-  padding: 10px 15px;
+  padding: 8px 12px;
   background-color: #4285f4;
   color: white;
   border: none;
@@ -167,8 +171,9 @@ header {
   cursor: pointer;
   font-weight: bold;
   flex: 1;
-  min-width: 120px;
+  min-width: 100px;
   text-align: center;
+  font-size: 14px;
 }
 
 .action-button:hover {
@@ -191,20 +196,21 @@ header {
   background-color: #ffeded;
   border-radius: 5px;
   border: 1px solid #ffcdcd;
+  font-size: 14px;
 }
 
 .data-sections {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 15px;
 }
 
 .markers-section, .polygons-section {
-  max-height: 200px;
+  max-height: 150px;
   overflow-y: auto;
   border: 1px solid #ddd;
   border-radius: 4px;
-  padding: 10px;
+  padding: 8px;
   background-color: white;
 }
 
@@ -215,11 +221,12 @@ header {
 }
 
 .markers-section li, .polygons-section li {
-  padding: 8px;
+  padding: 6px;
   border-bottom: 1px solid #eee;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  font-size: 14px;
 }
 
 .polygons-section li {
@@ -248,59 +255,29 @@ header {
   cursor: pointer;
   font-weight: bold;
   margin-left: 8px;
+  font-size: 12px;
 }
 
 .small-button:hover {
   background-color: #ff7875;
 }
 
-@media (min-width: 768px) {
-  .content {
-    flex-direction: row;
-  }
-  
-  .map-container {
-    flex: 2;
-  }
-  
-  .controls-panel {
-    flex: 1;
-    max-width: 350px;
-  }
-  
-  .data-sections {
-    flex-direction: column;
-  }
-}
-
-@media (max-width: 767px) {
-  .measurements-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .actions {
-    flex-direction: column;
-  }
-}
-
 .location-bar {
   position: fixed;
-  top: 24px;
-  left: 28px;
+  top: 10px;
+  left: 10px;
   z-index: 10;
   display: flex;
   justify-content: center;
   align-items: center;
-  width: 350px;
+  width: calc(100% - 20px);
+  max-width: 350px;
   padding: 4px;
-  /* background: #f8f9fa; */
-  /* border-bottom: 2px solid #ddd; */
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
 .location-bar form {
   width: 100%;
-  max-width: 500px;
   position: relative;
 }
 
@@ -315,10 +292,10 @@ header {
 
 .search-input {
   flex: 1;
-  padding: 12px 15px;
+  padding: 10px;
   border: none;
   outline: none;
-  font-size: 16px;
+  font-size: 14px;
   color: #333;
   background: transparent;
   transition: all 0.3s ease-in-out;
@@ -333,13 +310,14 @@ header {
 }
 
 .search-button {
-  padding: 12px 20px;
+  padding: 10px 15px;
   border: none;
   background: #28a745;
   color: #fff;
   font-weight: bold;
   cursor: pointer;
   transition: background 0.3s ease-in-out;
+  font-size: 14px;
 }
 
 .search-button:hover {
@@ -360,14 +338,14 @@ header {
   border-radius: 10px;
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
   overflow: hidden;
-  max-height: 300px;
+  max-height: 250px;
   overflow-y: auto;
   margin-top: 5px;
   z-index: 1000;
 }
 
 .search-result-item {
-  padding: 12px 15px;
+  padding: 10px;
   border-bottom: 1px solid #eee;
   cursor: pointer;
   transition: background 0.3s ease-in-out;
@@ -380,28 +358,123 @@ header {
 .result-name {
   font-weight: bold;
   color: #333;
+  font-size: 14px;
 }
 
 .result-address {
-  font-size: 14px;
+  font-size: 12px;
   color: #666;
 }
 
-/* 🔥 Responsive Design */
-@media (max-width: 600px) {
-  .location-bar {
-    padding: 8px;
+/* Small mobile devices */
+@media (max-width: 480px) {
+  .app-container {
+    padding: 5px;
+    height: auto;
   }
+  
+  .map-container {
+    height: 70vh;
+  }
+  
+  .controls-panel {
+    padding: 10px;
+    height: auto;
+  }
+  
+  .measurements h1 {
+    font-size: 1.2rem;
+  }
+  
+  .action-button {
+    padding: 6px 10px;
+    font-size: 12px;
+    min-width: 80px;
+  }
+  
+  .location-bar {
+    top: 5px;
+    left: 5px;
+    width: calc(70% - 10px);
+    max-width: none;
+  }
+  
+  .search-button {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+}
 
-  .search-container {
-    .search-input {
-      font-size: 14px;
-      padding: 10px;
-    }
+/* Medium devices (tablets) */
+@media (min-width: 481px) and (max-width: 767px) {
+  .measurements-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  
+  .map-container {
+    height: 45vh;
+  }
+  
+  .controls-panel {
+    max-height: 50vh;
+  }
+}
 
-    .search-button {
-      padding: 10px 15px;
-      font-size: 14px;
-    }
+/* Larger screens */
+@media (min-width: 768px) {
+  .content {
+    flex-direction: row;
+  }
+  
+  .map-container {
+    flex: 2;
+    height: 96vh;
+  }
+  
+  .controls-panel {
+    flex: 1;
+    max-width: 350px;
+    height: 96vh;
+    overflow-y: auto;
+    padding: 20px;
+  }
+  
+  .measurements-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  
+  .measurements h1 {
+    font-size: 1.8rem;
+  }
+  
+  .action-button {
+    padding: 10px 15px;
+    font-size: 16px;
+  }
+  
+  .location-bar {
+    top: 24px;
+    left: 28px;
+    width: 350px;
+  }
+}
+
+/* Large desktop screens */
+@media (min-width: 1200px) {
+  .controls-panel {
+    max-width: 400px;
+  }
+  
+  .measurements-grid {
+    gap: 15px;
+  }
+  
+  .action-button {
+    min-width: 140px;
   }
 }
