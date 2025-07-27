@@ -308,6 +308,39 @@ const App = () => {
     }
   };
 
+  const flyToDeviceLocation = () => {
+    const mapInstance = mapRef.current;
+
+    if (!mapInstance) return;
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const lat = position.coords.latitude;
+          const lon = position.coords.longitude;
+
+          mapInstance.flyTo([lat, lon], 14);
+
+          // Add marker at current location
+          const newMarker = {
+            id: Date.now(),
+            position: [lat, lon],
+            label: "Your Location"
+          };
+
+          setMarkers((prevMarkers) => [...prevMarkers, newMarker]);
+        },
+        (error) => {
+          console.error("Error getting location:", error);
+          alert("Unable to retrieve your location.");
+        }
+      );
+    } else {
+      alert("Geolocation is not supported by this browser.");
+    }
+  };
+
+
   const detectBoundaries = async () => {
     setIsProcessing(true);
     setErrorMessage('');
@@ -413,6 +446,74 @@ const App = () => {
     linkElement.setAttribute('download', exportFileDefaultName);
     linkElement.click();
   };
+
+
+  // PWA Install Button Component
+const PWAInstallButton = () => {
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [showInstall, setShowInstall] = useState(false);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e) => {
+      // Prevent the mini-infobar from appearing on mobile
+      e.preventDefault();
+      // Stash the event so it can be triggered later
+      setDeferredPrompt(e);
+      setShowInstall(true);
+    };
+
+    const handleAppInstalled = () => {
+      console.log('PWA was installed');
+      setShowInstall(false);
+      setDeferredPrompt(null);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) {
+      return;
+    }
+
+    // Show the install prompt
+    deferredPrompt.prompt();
+
+    // Wait for the user to respond to the prompt
+    const { outcome } = await deferredPrompt.userChoice;
+    
+    if (outcome === 'accepted') {
+      console.log('User accepted the install prompt');
+    } else {
+      console.log('User dismissed the install prompt');
+    }
+
+    // Clear the deferredPrompt
+    setDeferredPrompt(null);
+    setShowInstall(false);
+  };
+
+  if (!showInstall) {
+    return null;
+  }
+
+  return (
+    <button 
+      onClick={handleInstallClick}
+      className="pwa-install-button"
+      title="Install App"
+    >
+      Install App
+    </button>
+  );
+};
+
 
   const copyPolygonCoordinates = () => {
     if (currentPolygon) {
@@ -534,6 +635,7 @@ const App = () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
 
   // hook to handle mouse movement
   const MouseMoveHandler = () => {
@@ -668,9 +770,9 @@ const App = () => {
         </div>
         
         <div className="controls-panel">
+          <PWAInstallButton/>
           <div className="measurements">
             <h1> Geo Measurements</h1>
-            
             {currentPolygon && (
               <div className="measurements-grid">
                 <div className="measurement-item">
@@ -780,11 +882,10 @@ const App = () => {
             </button>
             
             <button 
-              onClick={exportData} 
-              disabled={polygons.length === 0 && polylines.length === 0 && markers.length === 0}
+              onClick={flyToDeviceLocation}
               className="action-button"
             >
-              Export Data
+              Device Location
             </button>
           </div>
           
