@@ -447,6 +447,69 @@ const App = () => {
     linkElement.click();
   };
 
+function flattenCoords(input) {
+  // Recursively find [lon, lat] pairs anywhere in the nested array structure
+  const out = [];
+  function recurse(arr) {
+    if (!Array.isArray(arr)) return;
+    // A coordinate pair: [number, number]
+    if (
+      arr.length >= 2 &&
+      typeof arr[0] === 'number' &&
+      typeof arr[1] === 'number'
+    ) {
+      out.push([arr[0], arr[1]]);
+      return;
+    }
+    for (const item of arr) recurse(item);
+  }
+  recurse(input);
+  return out;
+}
+
+function computeBBox(coords) {
+  // coords can be nested (GeoJSON polygon style) or a flat array of [lon,lat] pairs
+  const flat = flattenCoords(coords || []);
+  if (!flat.length) return null;
+  const lons = flat.map(c => Number(c[0])).filter(Number.isFinite);
+  const lats = flat.map(c => Number(c[1])).filter(Number.isFinite);
+  if (!lons.length || !lats.length) return null;
+  const lonmin = Math.min(...lons);
+  const latmin = Math.min(...lats);
+  const lonmax = Math.max(...lons);
+  const latmax = Math.max(...lats);
+  return {
+    lonmin, latmin, lonmax, latmax,
+    toString: () => `[${lonmin.toFixed(6)}, ${latmin.toFixed(6)}, ${lonmax.toFixed(6)}, ${latmax.toFixed(6)}]`
+  };
+}
+
+async function safeCopy(text) {
+  if (!text) return;
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      // fallback for older browsers
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'absolute';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+    }
+    // optional: show a toast or small visual feedback here
+  } catch (err) {
+    console.error('Copy failed', err);
+  }
+}
+
+// Compute bboxes for render
+const polygonBbox = currentPolygon ? computeBBox(currentPolygon.coordinates || currentPolygon) : null;
+const polylineBbox = currentPolyline ? computeBBox(currentPolyline.coordinates || currentPolyline) : null;
 
   // PWA Install Button Component
 const PWAInstallButton = () => {
@@ -826,42 +889,77 @@ const PWAInstallButton = () => {
                 </div>
               </div>
             )}
-            
             {currentPolygon && (
-              <div className="current-polygon">
-                <h3>Current Polygon</h3>
-                <div className="polygon-coordinates-container">
-                  <textarea 
-                    className="polygon-coordinates" 
-                    readOnly 
-                    value={currentPolygon.coordinates
-                      .map(coord => `[${coord[0].toFixed(6)}, ${coord[1].toFixed(6)}]`)
-                      .join(',\n')}
-                  />
-                  <button onClick={copyPolygonCoordinates} className="copy-button">
-                    Copy
-                  </button>
-                </div>
-              </div>
-            )}
-            
-            {currentPolyline && (
-              <div className="current-polyline">
-                <h3>Current Polyline</h3>
-                <div className="polyline-coordinates-container">
-                  <textarea 
-                    className="polyline-coordinates" 
-                    readOnly 
-                    value={currentPolyline.coordinates
-                      .map(coord => `[${coord[0].toFixed(6)}, ${coord[1].toFixed(6)}]`)
-                      .join(',\n')}
-                  />
-                  <button onClick={copyPolylineCoordinates} className="copy-button">
-                    Copy
-                  </button>
-                </div>
-              </div>
-            )}
+  <div className="current-polygon">
+    <h3>Current Polygon</h3>
+    <div className="polygon-coordinates-container">
+      <textarea 
+        className="polygon-coordinates" 
+        readOnly 
+        value={currentPolygon.coordinates
+          .map(coord => `[${coord[0].toFixed(6)}, ${coord[1].toFixed(6)}]`)
+          .join(',\n')}
+      />
+      <button onClick={copyPolygonCoordinates} className="copy-button">
+        Copy
+      </button>
+    </div>
+
+    {/* Bounding Box */}
+    <h4>Bounding Box (lonmin, latmin, lonmax, latmax)</h4>
+    <div className="polygon-coordinates-container">
+      <textarea
+        className="polygon-coordinates"
+        readOnly
+        value={polygonBbox ? polygonBbox.toString() : ''}
+      />
+      {/* ✅ Button always visible now */}
+      <button
+        onClick={() => safeCopy(polygonBbox ? polygonBbox.toString() : '')}
+        className="copy-button"
+      >
+        Copy BBox
+      </button>
+    </div>
+  </div>
+)}
+
+{currentPolyline && (
+  <div className="current-polyline">
+    <h3>Current Polyline</h3>
+    <div className="polyline-coordinates-container">
+      <textarea 
+        className="polyline-coordinates" 
+        readOnly 
+        value={currentPolyline.coordinates
+          .map(coord => `[${coord[0].toFixed(6)}, ${coord[1].toFixed(6)}]`)
+          .join(',\n')}
+      />
+      <button onClick={copyPolylineCoordinates} className="copy-button">
+        Copy
+      </button>
+    </div>
+
+    {/* BBox for polyline */}
+    <div className="polyline-bbox-container">
+      <h4>Bounding Box (lonmin, latmin, lonmax, latmax)</h4>
+      <textarea
+        className="polyline-bbox"
+        readOnly
+        value={polylineBbox ? polylineBbox.toString() : ''}
+      />
+      {/* ✅ Button always visible now */}
+      <button
+        onClick={() => safeCopy(polylineBbox ? polylineBbox.toString() : '')}
+        className="copy-button"
+      >
+        Copy BBox
+      </button>
+    </div>
+  </div>
+)}
+
+
           </div>
           
           <div className="actions">
